@@ -4,7 +4,6 @@
 //
 //  Created by Zehra Arslan on 21.05.2025.
 //
-
 import SwiftUI
 
 struct EditExpenseView: View {
@@ -14,6 +13,7 @@ struct EditExpenseView: View {
     @State private var title: String
     @State private var amount: String
     @State private var selectedCategory: Category
+    @State private var selectedDate: Date
     let expense: Expense
 
     init(viewModel: ExpenseViewModel, expense: Expense) {
@@ -22,6 +22,7 @@ struct EditExpenseView: View {
         _title = State(initialValue: expense.title)
         _amount = State(initialValue: String(format: "%.2f", expense.amount))
         _selectedCategory = State(initialValue: expense.category)
+        _selectedDate = State(initialValue: expense.date)
     }
 
     var body: some View {
@@ -30,9 +31,11 @@ struct EditExpenseView: View {
                 Section(header: Text("Harcama Bilgisi")) {
                     TextField("Başlık", text: $title)
                         .autocapitalization(.sentences)
-                    
+
                     TextField("Tutar (₺)", text: $amount)
                         .keyboardType(.decimalPad)
+
+                    DatePicker("Tarih Seç", selection: $selectedDate, displayedComponents: .date)
                 }
 
                 Section(header: Text("Kategori")) {
@@ -72,7 +75,7 @@ struct EditExpenseView: View {
             viewModel.expenses[index].title = title.trimmingCharacters(in: .whitespaces)
             viewModel.expenses[index].amount = value
             viewModel.expenses[index].category = selectedCategory
-            viewModel.expenses[index].date = Date() // İsteğe bağlı: tarih güncellenir
+            viewModel.expenses[index].date = selectedDate
         }
         dismiss()
     }

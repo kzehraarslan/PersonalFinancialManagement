@@ -1,4 +1,4 @@
-//  ContentView.swift
+//ContentView.swift
 import SwiftUI
 
 struct ContentView: View {
@@ -6,7 +6,12 @@ struct ContentView: View {
     @State private var selectedCategory: Category? = nil
     @State private var showingAddExpense = false
     @State private var showingStats = false
+    @State private var showingLimitSettings = false
     @State private var selectedExpense: Expense? = nil
+    @State private var showingShareSheet = false
+    @State private var exportURL: URL? = nil
+    @State private var showingPDFShareSheet = false
+    @State private var pdfURL: URL? = nil
     @AppStorage("username") private var username: String = ""
 
     var filteredExpenses: [Expense] {
@@ -20,7 +25,13 @@ struct ContentView: View {
     var body: some View {
         NavigationView {
             VStack {
-                // Kategori filtreleme menüsü
+                if viewModel.isLimitExceeded() {
+                    Text("⚠️ Aylık harcama limitini aştın!")
+                        .foregroundColor(.red)
+                        .bold()
+                        .padding(.vertical, 8)
+                }
+
                 Picker("Kategori Seç", selection: $selectedCategory) {
                     Text("Tümü").tag(Category?.none)
                     ForEach(Category.allCases) { category in
@@ -30,7 +41,6 @@ struct ContentView: View {
                 .pickerStyle(.menu)
                 .padding(.horizontal)
 
-                // Harcama listesi
                 List {
                     ForEach(filteredExpenses) { expense in
                         HStack {
@@ -60,7 +70,6 @@ struct ContentView: View {
             }
             .navigationTitle("Hoş geldin, \(username)")
             .toolbar {
-                // Grafik Sayfası
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
                         showingStats = true
@@ -69,7 +78,14 @@ struct ContentView: View {
                     }
                 }
 
-                // Harcama Ekle
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        showingLimitSettings = true
+                    } label: {
+                        Image(systemName: "slider.horizontal.3")
+                    }
+                }
+
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         showingAddExpense = true
@@ -78,7 +94,22 @@ struct ContentView: View {
                     }
                 }
 
-                // Çıkış Yap Menüsü
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        exportCSV()
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        exportPDF()
+                    } label: {
+                        Image(systemName: "doc.richtext")
+                    }
+                }
+
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
                         Button(role: .destructive) {
@@ -91,16 +122,45 @@ struct ContentView: View {
                     }
                 }
             }
-            // Sayfa geçişleri
             .sheet(isPresented: $showingAddExpense) {
                 AddExpenseView(viewModel: viewModel)
             }
             .sheet(isPresented: $showingStats) {
                 StatisticsView(viewModel: viewModel)
             }
+            .sheet(isPresented: $showingLimitSettings) {
+                LimitSettingView(viewModel: viewModel)
+            }
             .sheet(item: $selectedExpense) { expense in
                 EditExpenseView(viewModel: viewModel, expense: expense)
             }
+            .sheet(isPresented: $showingShareSheet) {
+                if let exportURL = exportURL {
+                    ShareSheet(activityItems: [exportURL])
+                }
+            }
+            .sheet(isPresented: $showingPDFShareSheet) {
+                if let pdfURL = pdfURL {
+                    ShareSheet(activityItems: [pdfURL])
+                }
+            }
+        }
+    }
+
+    // CSV Export Fonksiyonu (önceki hali)
+    func exportCSV() {
+        let csvString = CSVExportManager.generateCSV(from: viewModel.expenses)
+        if let fileURL = CSVExportManager.exportCSVFile(named: "HarcamaRaporu", content: csvString) {
+            exportURL = fileURL
+            showingShareSheet = true
+        }
+    }
+
+    // PDF Export Fonksiyonu
+    func exportPDF() {
+        if let fileURL = PDFReportManager.createPDF(expenses: viewModel.expenses, monthlyLimit: viewModel.monthlyLimit) {
+            pdfURL = fileURL
+            showingPDFShareSheet = true
         }
     }
 }

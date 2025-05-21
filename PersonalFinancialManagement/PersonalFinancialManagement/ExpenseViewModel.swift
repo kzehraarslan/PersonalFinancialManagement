@@ -1,4 +1,3 @@
-//ExpenseViewModel.swift
 import Foundation
 import SwiftUI
 
@@ -7,29 +6,20 @@ class ExpenseViewModel: ObservableObject {
         didSet { saveExpenses() }
     }
 
-    // MARK: - Init
+    @AppStorage("monthlyLimit") var monthlyLimit: Double = 0.0
 
     init() {
         loadExpenses()
     }
 
-    // MARK: - Ekle / Sil
-
-    func addExpense(title: String, amount: Double, category: Category) {
-        let newExpense = Expense(
-            title: title,
-            amount: amount,
-            category: category,
-            date: Date()
-        )
+    func addExpense(title: String, amount: Double, category: Category, date: Date) {
+        let newExpense = Expense(title: title, amount: amount, category: category, date: date)
         expenses.append(newExpense)
     }
 
     func deleteExpense(at offsets: IndexSet) {
         expenses.remove(atOffsets: offsets)
     }
-
-    // MARK: - Verileri Kalıcı Sakla
 
     private func saveExpenses() {
         if let encoded = try? JSONEncoder().encode(expenses) {
@@ -44,8 +34,18 @@ class ExpenseViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Kategoriye Göre Toplam
+    func isLimitExceeded() -> Bool {
+        monthlyLimit > 0 && totalThisMonth() > monthlyLimit
+    }
 
+    func totalThisMonth() -> Double {
+        let calendar = Calendar.current
+        let now = Date()
+        return expenses.filter { calendar.isDate($0.date, equalTo: now, toGranularity: .month) }
+            .reduce(0) { $0 + $1.amount }
+    }
+
+    // Toplam harcamalar kategoriye göre
     func totalPerCategory() -> [Category: Double] {
         var totals: [Category: Double] = [:]
         for expense in expenses {
@@ -53,27 +53,35 @@ class ExpenseViewModel: ObservableObject {
         }
         return totals
     }
-}
 
-// MARK: - İstatistiksel Filtreler
-
-extension ExpenseViewModel {
-
-    /// Her gün için toplam harcamayı döndürür
-    func totalPerDay() -> [String: Double] {
+    // Toplam harcamalar yıla göre (String olarak)
+    func totalPerYear() -> [String: Double] {
+        let calendar = Calendar.current
         var result: [String: Double] = [:]
         for expense in expenses {
-            let day = DateFormatter.localizedString(from: expense.date, dateStyle: .short, timeStyle: .none)
-            result[day, default: 0] += expense.amount
+            let year = calendar.component(.year, from: expense.date)
+            result["\(year)", default: 0] += expense.amount
         }
         return result
     }
 
-    /// Her hafta için toplam harcamayı döndürür
-    func totalPerWeek() -> [String: Double] {
-        var result: [String: Double] = [:]
+    // Toplam harcamalar aya göre (String olarak "YYYY-M" formatında)
+    func totalPerMonth() -> [String: Double] {
         let calendar = Calendar.current
+        var result: [String: Double] = [:]
+        for expense in expenses {
+            let year = calendar.component(.year, from: expense.date)
+            let month = calendar.component(.month, from: expense.date)
+            let key = "\(year)-\(month)"
+            result[key, default: 0] += expense.amount
+        }
+        return result
+    }
 
+    // Toplam harcamalar haftaya göre (String olarak "Hafta W, YYYY")
+    func totalPerWeek() -> [String: Double] {
+        let calendar = Calendar.current
+        var result: [String: Double] = [:]
         for expense in expenses {
             let week = calendar.component(.weekOfYear, from: expense.date)
             let year = calendar.component(.yearForWeekOfYear, from: expense.date)
@@ -83,49 +91,31 @@ extension ExpenseViewModel {
         return result
     }
 
-    /// Her ay için toplam harcamayı döndürür
-    func totalPerMonth() -> [String: Double] {
+    // Toplam harcamalar güne göre (String olarak)
+    func totalPerDay() -> [String: Double] {
         var result: [String: Double] = [:]
-        let calendar = Calendar.current
-
         for expense in expenses {
-            let month = calendar.component(.month, from: expense.date)
-            let year = calendar.component(.year, from: expense.date)
-            let key = "\(year)-\(month)"
-            result[key, default: 0] += expense.amount
+            let day = DateFormatter.localizedString(from: expense.date, dateStyle: .short, timeStyle: .none)
+            result[day, default: 0] += expense.amount
         }
         return result
     }
 
-    /// Her yıl için toplam harcamayı döndürür
-    func totalPerYear() -> [String: Double] {
-        var result: [String: Double] = [:]
-        let calendar = Calendar.current
-
-        for expense in expenses {
-            let year = calendar.component(.year, from: expense.date)
-            result["\(year)", default: 0] += expense.amount
-        }
-        return result
-    }
-
-    /// Bu haftaki toplam harcama
+    // Bu haftaki toplam harcama
     func totalThisWeek() -> Double {
         let calendar = Calendar.current
         let now = Date()
-        return expenses
-            .filter { calendar.isDate($0.date, equalTo: now, toGranularity: .weekOfYear) }
+        return expenses.filter { calendar.isDate($0.date, equalTo: now, toGranularity: .weekOfYear) }
             .reduce(0) { $0 + $1.amount }
     }
 
-    /// Geçen haftaki toplam harcama
+    // Geçen haftaki toplam harcama
     func totalPreviousWeek() -> Double {
         let calendar = Calendar.current
         guard let previousWeek = calendar.date(byAdding: .weekOfYear, value: -1, to: Date()) else {
             return 0
         }
-        return expenses
-            .filter { calendar.isDate($0.date, equalTo: previousWeek, toGranularity: .weekOfYear) }
+        return expenses.filter { calendar.isDate($0.date, equalTo: previousWeek, toGranularity: .weekOfYear) }
             .reduce(0) { $0 + $1.amount }
     }
 }

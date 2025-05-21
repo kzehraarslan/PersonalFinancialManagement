@@ -14,6 +14,7 @@ struct AddExpenseView: View {
     @State private var title: String = ""
     @State private var amount: String = ""
     @State private var selectedCategory: Category = .diger
+    @State private var selectedDate: Date = Date()
 
     var body: some View {
         NavigationView {
@@ -24,6 +25,8 @@ struct AddExpenseView: View {
 
                     TextField("Tutar (₺)", text: $amount)
                         .keyboardType(.decimalPad)
+
+                    DatePicker("Tarih Seç", selection: $selectedDate, displayedComponents: .date)
                 }
 
                 Section(header: Text("Kategori")) {
@@ -63,7 +66,8 @@ struct AddExpenseView: View {
         viewModel.addExpense(
             title: title.trimmingCharacters(in: .whitespaces),
             amount: value,
-            category: selectedCategory
+            category: selectedCategory,
+            date: selectedDate
         )
         dismiss()
     }
