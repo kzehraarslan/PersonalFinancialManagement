@@ -1,9 +1,3 @@
-//
-//  EditExpenseView.swift
-//  PersonalFinancialManagement
-//
-//  Created by Zehra Arslan on 21.05.2025.
-//
 import SwiftUI
 
 struct EditExpenseView: View {
@@ -14,6 +8,9 @@ struct EditExpenseView: View {
     @State private var amount: String
     @State private var selectedCategory: Category
     @State private var selectedDate: Date
+    @State private var photoData: Data?  // Fotoğraf verisi için state
+    @State private var showImagePicker = false
+
     let expense: Expense
 
     init(viewModel: ExpenseViewModel, expense: Expense) {
@@ -23,6 +20,7 @@ struct EditExpenseView: View {
         _amount = State(initialValue: String(format: "%.2f", expense.amount))
         _selectedCategory = State(initialValue: expense.category)
         _selectedDate = State(initialValue: expense.date)
+        _photoData = State(initialValue: expense.photoData)  // Mevcut fotoğrafı getir
     }
 
     var body: some View {
@@ -46,6 +44,19 @@ struct EditExpenseView: View {
                     }
                     .pickerStyle(.segmented)
                 }
+
+                Section(header: Text("Fotoğraf")) {
+                    Button("Fotoğraf Seç") {
+                        showImagePicker = true
+                    }
+
+                    if let data = photoData, let uiImage = UIImage(data: data) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .frame(width: 100, height: 100)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                }
             }
             .navigationTitle("Harcama Düzenle")
             .toolbar {
@@ -62,6 +73,9 @@ struct EditExpenseView: View {
                     .disabled(!isFormValid)
                 }
             }
+            .sheet(isPresented: $showImagePicker) {
+                ImagePicker(imageData: $photoData)
+            }
         }
     }
 
@@ -76,6 +90,7 @@ struct EditExpenseView: View {
             viewModel.expenses[index].amount = value
             viewModel.expenses[index].category = selectedCategory
             viewModel.expenses[index].date = selectedDate
+            viewModel.expenses[index].photoData = photoData // Fotoğraf verisini güncelle
         }
         dismiss()
     }

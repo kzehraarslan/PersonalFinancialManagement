@@ -1,4 +1,3 @@
-//ContentView.swift
 import SwiftUI
 
 struct ContentView: View {
@@ -7,6 +6,7 @@ struct ContentView: View {
     @State private var showingAddExpense = false
     @State private var showingStats = false
     @State private var showingLimitSettings = false
+    @State private var showingThemeSettings = false
     @State private var selectedExpense: Expense? = nil
     @State private var showingShareSheet = false
     @State private var exportURL: URL? = nil
@@ -43,7 +43,17 @@ struct ContentView: View {
 
                 List {
                     ForEach(filteredExpenses) { expense in
-                        HStack {
+                        HStack(spacing: 15) {
+                            // Fotoğraf varsa göster
+                            if let data = expense.photoData, let uiImage = UIImage(data: data) {
+                                Image(uiImage: uiImage)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 60, height: 60)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .clipped()
+                            }
+
                             VStack(alignment: .leading) {
                                 Text(expense.title)
                                     .font(.headline)
@@ -65,7 +75,9 @@ struct ContentView: View {
                             selectedExpense = expense
                         }
                     }
-                    .onDelete(perform: viewModel.deleteExpense)
+                    .onDelete { indexSet in
+                        viewModel.deleteExpense(at: indexSet)
+                    }
                 }
             }
             .navigationTitle("Hoş geldin, \(username)")
@@ -86,6 +98,14 @@ struct ContentView: View {
                     }
                 }
 
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        showingThemeSettings = true
+                    } label: {
+                        Image(systemName: "paintbrush")
+                    }
+                }
+
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         showingAddExpense = true
@@ -101,7 +121,7 @@ struct ContentView: View {
                         Image(systemName: "square.and.arrow.up")
                     }
                 }
-                
+
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         exportPDF()
@@ -131,6 +151,9 @@ struct ContentView: View {
             .sheet(isPresented: $showingLimitSettings) {
                 LimitSettingView(viewModel: viewModel)
             }
+            .sheet(isPresented: $showingThemeSettings) {
+                ThemeSettingView()
+            }
             .sheet(item: $selectedExpense) { expense in
                 EditExpenseView(viewModel: viewModel, expense: expense)
             }
@@ -147,7 +170,6 @@ struct ContentView: View {
         }
     }
 
-    // CSV Export Fonksiyonu (önceki hali)
     func exportCSV() {
         let csvString = CSVExportManager.generateCSV(from: viewModel.expenses)
         if let fileURL = CSVExportManager.exportCSVFile(named: "HarcamaRaporu", content: csvString) {
@@ -156,7 +178,6 @@ struct ContentView: View {
         }
     }
 
-    // PDF Export Fonksiyonu
     func exportPDF() {
         if let fileURL = PDFReportManager.createPDF(expenses: viewModel.expenses, monthlyLimit: viewModel.monthlyLimit) {
             pdfURL = fileURL

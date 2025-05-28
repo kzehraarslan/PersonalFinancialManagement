@@ -1,20 +1,43 @@
 import Foundation
 import SwiftUI
+import UserNotifications
 
 class ExpenseViewModel: ObservableObject {
     @Published var expenses: [Expense] = [] {
         didSet { saveExpenses() }
     }
-
+    
     @AppStorage("monthlyLimit") var monthlyLimit: Double = 0.0
 
     init() {
         loadExpenses()
+        // Uygulama açıldığında da bildirim yetkisi iste
+        requestNotificationAuthorization()
+    }
+    
+    private func requestNotificationAuthorization() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            if let error = error {
+                print("Bildirim izni hatası: \(error.localizedDescription)")
+            }
+        }
     }
 
-    func addExpense(title: String, amount: Double, category: Category, date: Date) {
-        let newExpense = Expense(title: title, amount: amount, category: category, date: date)
+    func addExpense(title: String, amount: Double, category: Category, date: Date, photoData: Data? = nil) {
+        var newExpense = Expense(
+            id: UUID(),
+            title: title,
+            amount: amount,
+            category: category,
+            date: date
+        )
+        newExpense.photoData = photoData
         expenses.append(newExpense)
+        
+        // Limit aşıldı mı kontrol et ve bildirim gönder
+        if isLimitExceeded() {
+            sendLimitExceededNotification()
+        }
     }
 
     func deleteExpense(at offsets: IndexSet) {
@@ -22,15 +45,22 @@ class ExpenseViewModel: ObservableObject {
     }
 
     private func saveExpenses() {
-        if let encoded = try? JSONEncoder().encode(expenses) {
+        do {
+            let encoded = try JSONEncoder().encode(expenses)
             UserDefaults.standard.set(encoded, forKey: "expenses")
+        } catch {
+            print("Harcama verilerini kaydetme hatası: \(error.localizedDescription)")
         }
     }
 
     private func loadExpenses() {
-        if let data = UserDefaults.standard.data(forKey: "expenses"),
-           let decoded = try? JSONDecoder().decode([Expense].self, from: data) {
-            expenses = decoded
+        if let data = UserDefaults.standard.data(forKey: "expenses") {
+            do {
+                let decoded = try JSONDecoder().decode([Expense].self, from: data)
+                expenses = decoded
+            } catch {
+                print("Harcama verilerini yükleme hatası: \(error.localizedDescription)")
+            }
         }
     }
 
@@ -41,11 +71,11 @@ class ExpenseViewModel: ObservableObject {
     func totalThisMonth() -> Double {
         let calendar = Calendar.current
         let now = Date()
-        return expenses.filter { calendar.isDate($0.date, equalTo: now, toGranularity: .month) }
+        return expenses
+            .filter { calendar.isDate($0.date, equalTo: now, toGranularity: .month) }
             .reduce(0) { $0 + $1.amount }
     }
 
-    // Toplam harcamalar kategoriye göre
     func totalPerCategory() -> [Category: Double] {
         var totals: [Category: Double] = [:]
         for expense in expenses {
@@ -54,10 +84,9 @@ class ExpenseViewModel: ObservableObject {
         return totals
     }
 
-    // Toplam harcamalar yıla göre (String olarak)
     func totalPerYear() -> [String: Double] {
-        let calendar = Calendar.current
         var result: [String: Double] = [:]
+        let calendar = Calendar.current
         for expense in expenses {
             let year = calendar.component(.year, from: expense.date)
             result["\(year)", default: 0] += expense.amount
@@ -65,10 +94,9 @@ class ExpenseViewModel: ObservableObject {
         return result
     }
 
-    // Toplam harcamalar aya göre (String olarak "YYYY-M" formatında)
     func totalPerMonth() -> [String: Double] {
-        let calendar = Calendar.current
         var result: [String: Double] = [:]
+        let calendar = Calendar.current
         for expense in expenses {
             let year = calendar.component(.year, from: expense.date)
             let month = calendar.component(.month, from: expense.date)
@@ -78,10 +106,9 @@ class ExpenseViewModel: ObservableObject {
         return result
     }
 
-    // Toplam harcamalar haftaya göre (String olarak "Hafta W, YYYY")
     func totalPerWeek() -> [String: Double] {
-        let calendar = Calendar.current
         var result: [String: Double] = [:]
+        let calendar = Calendar.current
         for expense in expenses {
             let week = calendar.component(.weekOfYear, from: expense.date)
             let year = calendar.component(.yearForWeekOfYear, from: expense.date)
@@ -91,7 +118,6 @@ class ExpenseViewModel: ObservableObject {
         return result
     }
 
-    // Toplam harcamalar güne göre (String olarak)
     func totalPerDay() -> [String: Double] {
         var result: [String: Double] = [:]
         for expense in expenses {
@@ -101,21 +127,56 @@ class ExpenseViewModel: ObservableObject {
         return result
     }
 
-    // Bu haftaki toplam harcama
     func totalThisWeek() -> Double {
         let calendar = Calendar.current
         let now = Date()
-        return expenses.filter { calendar.isDate($0.date, equalTo: now, toGranularity: .weekOfYear) }
+        return expenses
+            .filter { calendar.isDate($0.date, equalTo: now, toGranularity: .weekOfYear) }
             .reduce(0) { $0 + $1.amount }
     }
 
-    // Geçen haftaki toplam harcama
     func totalPreviousWeek() -> Double {
         let calendar = Calendar.current
         guard let previousWeek = calendar.date(byAdding: .weekOfYear, value: -1, to: Date()) else {
             return 0
         }
-        return expenses.filter { calendar.isDate($0.date, equalTo: previousWeek, toGranularity: .weekOfYear) }
+        return expenses
+            .filter { calendar.isDate($0.date, equalTo: previousWeek, toGranularity: .weekOfYear) }
             .reduce(0) { $0 + $1.amount }
+    }
+
+    // Ekstra raporlar
+
+    func topCategory() -> (category: Category, amount: Double)? {
+        let totals = totalPerCategory()
+        guard let max = totals.max(by: { $0.value < $1.value }) else { return nil }
+        return (max.key, max.value)
+    }
+
+    func topDay() -> (day: String, amount: Double)? {
+        let totals = totalPerDay()
+        guard let max = totals.max(by: { $0.value < $1.value }) else { return nil }
+        return (max.key, max.value)
+    }
+
+    func totalSpending() -> Double {
+        expenses.reduce(0) { $0 + $1.amount }
+    }
+    
+    // Local Notification gönderme fonksiyonu
+    private func sendLimitExceededNotification() {
+        let content = UNMutableNotificationContent()
+        content.title = "Aylık Limit Aşıldı!"
+        content.body = "Aylık harcama limitiniz aşıldı, dikkatli harcama yapın."
+        content.sound = .default
+        
+        // Anında gösterim için trigger yok, direkt gönderiyoruz
+        let request = UNNotificationRequest(identifier: "limitExceeded", content: content, trigger: nil)
+        
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("Limit aşıldı bildirimi gönderilemedi: \(error.localizedDescription)")
+            }
+        }
     }
 }

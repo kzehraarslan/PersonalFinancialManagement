@@ -1,11 +1,5 @@
-//
-//  AddExpenseView.swift
-//  PersonalFinancialManagement
-//
-//  Created by Zehra Arslan on 16.05.2025.
-//
-
 import SwiftUI
+import PhotosUI
 
 struct AddExpenseView: View {
     @Environment(\.dismiss) private var dismiss
@@ -15,6 +9,8 @@ struct AddExpenseView: View {
     @State private var amount: String = ""
     @State private var selectedCategory: Category = .diger
     @State private var selectedDate: Date = Date()
+    @State private var selectedPhotoItem: PhotosPickerItem? = nil
+    @State private var selectedPhotoData: Data? = nil
 
     var body: some View {
         NavigationView {
@@ -37,6 +33,22 @@ struct AddExpenseView: View {
                     }
                     .pickerStyle(.segmented)
                 }
+
+                Section(header: Text("Fiş Fotoğrafı (Opsiyonel)")) {
+                    PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                        HStack {
+                            Image(systemName: "photo")
+                            Text(selectedPhotoItem == nil ? "Fotoğraf Seç" : "Fotoğraf Seçildi")
+                        }
+                    }
+                    if let data = selectedPhotoData, let uiImage = UIImage(data: data) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(height: 100)
+                            .cornerRadius(10)
+                    }
+                }
             }
             .navigationTitle("Harcama Ekle")
             .toolbar {
@@ -53,12 +65,20 @@ struct AddExpenseView: View {
                     .disabled(!isFormValid)
                 }
             }
+            .onChange(of: selectedPhotoItem) { newItem in
+                if let newItem = newItem {
+                    Task {
+                        if let data = try? await newItem.loadTransferable(type: Data.self) {
+                            selectedPhotoData = data
+                        }
+                    }
+                }
+            }
         }
     }
 
     private var isFormValid: Bool {
-        !title.trimmingCharacters(in: .whitespaces).isEmpty &&
-        Double(amount) != nil
+        !title.trimmingCharacters(in: .whitespaces).isEmpty && Double(amount) != nil
     }
 
     private func saveExpense() {
@@ -67,7 +87,8 @@ struct AddExpenseView: View {
             title: title.trimmingCharacters(in: .whitespaces),
             amount: value,
             category: selectedCategory,
-            date: selectedDate
+            date: selectedDate,
+            photoData: selectedPhotoData
         )
         dismiss()
     }
