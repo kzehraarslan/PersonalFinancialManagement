@@ -1,0 +1,8 @@
+/* Localizable.strings - English */
+"settings_title" = "Settings";
+"language_option" = "Language";
+"select_language" = "Select Language";
+"hello_world" = "Hello World";
+"language_selection" = "Language Selection";
+"cancel" = "Cancel";
+"save" = "Save";

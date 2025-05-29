@@ -8,8 +8,11 @@ struct EditExpenseView: View {
     @State private var amount: String
     @State private var selectedCategory: Category
     @State private var selectedDate: Date
-    @State private var photoData: Data?  // Fotoğraf verisi için state
+    @State private var photoData: Data?  // Fotoğraf verisi
     @State private var showImagePicker = false
+
+    // Fotoğrafı tam ekran göstermek için
+    @State private var showFullScreenPhoto = false
 
     let expense: Expense
 
@@ -20,7 +23,7 @@ struct EditExpenseView: View {
         _amount = State(initialValue: String(format: "%.2f", expense.amount))
         _selectedCategory = State(initialValue: expense.category)
         _selectedDate = State(initialValue: expense.date)
-        _photoData = State(initialValue: expense.photoData)  // Mevcut fotoğrafı getir
+        _photoData = State(initialValue: expense.photoData)
     }
 
     var body: some View {
@@ -51,10 +54,23 @@ struct EditExpenseView: View {
                     }
 
                     if let data = photoData, let uiImage = UIImage(data: data) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .frame(width: 100, height: 100)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                        VStack {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .frame(width: 100, height: 100)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                .onTapGesture {
+                                    showFullScreenPhoto = true
+                                }
+
+                            Button(role: .destructive) {
+                                photoData = nil
+                            } label: {
+                                Label("Fotoğrafı Sil", systemImage: "trash")
+                                    .foregroundColor(.red)
+                            }
+                            .buttonStyle(.borderless)
+                        }
                     }
                 }
             }
@@ -75,6 +91,11 @@ struct EditExpenseView: View {
             }
             .sheet(isPresented: $showImagePicker) {
                 ImagePicker(imageData: $photoData)
+            }
+            .fullScreenCover(isPresented: $showFullScreenPhoto) {
+                if let data = photoData, let uiImage = UIImage(data: data) {
+                    FullScreenPhotoViewControllerWrapper(image: uiImage)
+                }
             }
         }
     }

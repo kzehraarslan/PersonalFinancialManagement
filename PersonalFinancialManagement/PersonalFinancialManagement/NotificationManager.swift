@@ -1,10 +1,5 @@
-//
-//  NotificationManager.swift
-//  PersonalFinancialManagement
-//
-//  Created by Zehra Arslan on 28.05.2025.
-//
 import UserNotifications
+import SwiftUI
 
 class NotificationManager {
     static let shared = NotificationManager()
@@ -16,8 +11,7 @@ class NotificationManager {
             }
         }
     }
-}
-extension NotificationManager {
+
     func scheduleLimitExceededNotification() {
         let content = UNMutableNotificationContent()
         content.title = "Harcama Limiti Aşıldı!"
@@ -26,20 +20,43 @@ extension NotificationManager {
 
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
         let request = UNNotificationRequest(identifier: "limitExceeded", content: content, trigger: trigger)
-        UNUserNotificationCenter.current().add(request)
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("Limit bildirimi gönderilemedi: \(error.localizedDescription)")
+            }
+        }
     }
 
-    func scheduleDailyReminder() {
-        var dateComponents = DateComponents()
-        dateComponents.hour = 20  // Örnek: Her gün saat 20:00'de
+    func scheduleReminderNotification(frequencyInDays: Int) {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["reminderNotification"])
+        guard frequencyInDays > 0 else {
+            print("Bildirim kapatıldı.")
+            return
+        }
 
         let content = UNMutableNotificationContent()
         content.title = "Bugün Harcama Yaptın mı?"
-        content.body = "Günlük harcama kaydını unutma!"
+        content.body = "Harcama kaydını unutma!"
         content.sound = .default
 
-        let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
-        let request = UNNotificationRequest(identifier: "dailyReminder", content: content, trigger: trigger)
-        UNUserNotificationCenter.current().add(request)
+        var dateComponents = DateComponents()
+        dateComponents.hour = 20
+
+        let trigger: UNNotificationTrigger
+        if frequencyInDays == 1 {
+            trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
+        } else {
+            let interval = TimeInterval(86400 * frequencyInDays)
+            trigger = UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: true)
+        }
+
+        let request = UNNotificationRequest(identifier: "reminderNotification", content: content, trigger: trigger)
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("Hatırlatma bildirimi gönderilemedi: \(error.localizedDescription)")
+            } else {
+                print("Hatırlatma bildirimi başarıyla ayarlandı. Sıklık: \(frequencyInDays) gün.")
+            }
+        }
     }
 }

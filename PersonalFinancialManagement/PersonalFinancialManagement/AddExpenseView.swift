@@ -12,6 +12,9 @@ struct AddExpenseView: View {
     @State private var selectedPhotoItem: PhotosPickerItem? = nil
     @State private var selectedPhotoData: Data? = nil
 
+    // Fotoğrafı tam ekran göstermek için
+    @State private var showFullScreenPhoto = false
+
     var body: some View {
         NavigationView {
             Form {
@@ -42,11 +45,25 @@ struct AddExpenseView: View {
                         }
                     }
                     if let data = selectedPhotoData, let uiImage = UIImage(data: data) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(height: 100)
-                            .cornerRadius(10)
+                        VStack {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(height: 100)
+                                .cornerRadius(10)
+                                .onTapGesture {
+                                    showFullScreenPhoto = true
+                                }
+
+                            Button(role: .destructive) {
+                                selectedPhotoData = nil
+                                selectedPhotoItem = nil
+                            } label: {
+                                Label("Fotoğrafı Sil", systemImage: "trash")
+                                    .foregroundColor(.red)
+                            }
+                            .buttonStyle(.borderless)
+                        }
                     }
                 }
             }
@@ -74,6 +91,11 @@ struct AddExpenseView: View {
                     }
                 }
             }
+            .fullScreenCover(isPresented: $showFullScreenPhoto) {
+                if let data = selectedPhotoData, let uiImage = UIImage(data: data) {
+                    FullScreenPhotoViewControllerWrapper(image: uiImage)
+                }
+            }
         }
     }
 
@@ -92,4 +114,17 @@ struct AddExpenseView: View {
         )
         dismiss()
     }
+}
+
+// UIKit wrapper
+struct FullScreenPhotoViewControllerWrapper: UIViewControllerRepresentable {
+    let image: UIImage
+
+    func makeUIViewController(context: Context) -> FullScreenPhotoViewController {
+        let vc = FullScreenPhotoViewController()
+        vc.image = image
+        return vc
+    }
+
+    func updateUIViewController(_ uiViewController: FullScreenPhotoViewController, context: Context) {}
 }

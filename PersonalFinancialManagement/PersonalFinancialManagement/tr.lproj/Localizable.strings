@@ -1,0 +1,8 @@
+/* Localizable.strings - Turkish */
+"settings_title" = "Ayarlar";
+"language_option" = "Dil";
+"select_language" = "Dil Seç";
+"hello_world" = "Merhaba Dünya";
+"language_selection" = "Dil Seçimi";
+"cancel" = "İptal";
+"save" = "Kaydet";

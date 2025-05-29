@@ -1,3 +1,10 @@
+//
+//  ContentView.swift
+//  PersonalFinancialManagement
+//
+//  Created by Zehra Arslan on 29.05.2025.
+//
+
 import SwiftUI
 
 struct ContentView: View {
@@ -7,12 +14,12 @@ struct ContentView: View {
     @State private var showingStats = false
     @State private var showingLimitSettings = false
     @State private var showingThemeSettings = false
+    @State private var showingSettings = false
     @State private var selectedExpense: Expense? = nil
-    @State private var showingShareSheet = false
-    @State private var exportURL: URL? = nil
-    @State private var showingPDFShareSheet = false
-    @State private var pdfURL: URL? = nil
+    @State private var showExportMenu = false
+    @State private var shareFileURL: URL? = nil
     @AppStorage("username") private var username: String = ""
+    @StateObject private var languageManager = AppLanguageManager.shared
 
     var filteredExpenses: [Expense] {
         if let category = selectedCategory {
@@ -44,7 +51,6 @@ struct ContentView: View {
                 List {
                     ForEach(filteredExpenses) { expense in
                         HStack(spacing: 15) {
-                            // Fotoğraf varsa göster
                             if let data = expense.photoData, let uiImage = UIImage(data: data) {
                                 Image(uiImage: uiImage)
                                     .resizable()
@@ -83,54 +89,48 @@ struct ContentView: View {
             .navigationTitle("Hoş geldin, \(username)")
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        showingStats = true
+                    Menu {
+                        Button {
+                            showingStats = true
+                        } label: {
+                            Label("İstatistikler", systemImage: "chart.bar.fill")
+                        }
+
+                        Button {
+                            showingLimitSettings = true
+                        } label: {
+                            Label("Limit Ayarları", systemImage: "slider.horizontal.3")
+                        }
+
+                        Button {
+                            showingThemeSettings = true
+                        } label: {
+                            Label("Tema Ayarları", systemImage: "paintbrush")
+                        }
+
+                        Button {
+                            showingSettings = true
+                        } label: {
+                            Label("Genel Ayarlar", systemImage: "gear")
+                        }
                     } label: {
-                        Image(systemName: "chart.bar.fill")
+                        Image(systemName: "ellipsis.circle")
                     }
                 }
 
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        showingLimitSettings = true
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                    }
-                }
-
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        showingThemeSettings = true
-                    } label: {
-                        Image(systemName: "paintbrush")
-                    }
-                }
-
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Button {
                         showingAddExpense = true
                     } label: {
                         Image(systemName: "plus")
                     }
-                }
 
-                ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
-                        exportCSV()
+                        showExportMenu = true
                     } label: {
                         Image(systemName: "square.and.arrow.up")
                     }
-                }
 
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        exportPDF()
-                    } label: {
-                        Image(systemName: "doc.richtext")
-                    }
-                }
-
-                ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
                         Button(role: .destructive) {
                             username = ""
@@ -140,6 +140,24 @@ struct ContentView: View {
                     } label: {
                         Image(systemName: "person.crop.circle")
                     }
+                }
+            }
+            .actionSheet(isPresented: $showExportMenu) {
+                ActionSheet(
+                    title: Text("Paylaşım Şekli Seçin"),
+                    buttons: [
+                        .default(Text("CSV Olarak Paylaş")) { exportCSV() },
+                        .default(Text("PDF Olarak Paylaş")) { exportPDF() },
+                        .cancel()
+                    ]
+                )
+            }
+            .sheet(isPresented: Binding<Bool>(
+                get: { shareFileURL != nil },
+                set: { if !$0 { shareFileURL = nil } }
+            )) {
+                if let url = shareFileURL {
+                    ShareSheet(activityItems: [url])
                 }
             }
             .sheet(isPresented: $showingAddExpense) {
@@ -154,18 +172,11 @@ struct ContentView: View {
             .sheet(isPresented: $showingThemeSettings) {
                 ThemeSettingView()
             }
+            .sheet(isPresented: $showingSettings) {
+                SettingsView()
+            }
             .sheet(item: $selectedExpense) { expense in
                 EditExpenseView(viewModel: viewModel, expense: expense)
-            }
-            .sheet(isPresented: $showingShareSheet) {
-                if let exportURL = exportURL {
-                    ShareSheet(activityItems: [exportURL])
-                }
-            }
-            .sheet(isPresented: $showingPDFShareSheet) {
-                if let pdfURL = pdfURL {
-                    ShareSheet(activityItems: [pdfURL])
-                }
             }
         }
     }
@@ -173,15 +184,13 @@ struct ContentView: View {
     func exportCSV() {
         let csvString = CSVExportManager.generateCSV(from: viewModel.expenses)
         if let fileURL = CSVExportManager.exportCSVFile(named: "HarcamaRaporu", content: csvString) {
-            exportURL = fileURL
-            showingShareSheet = true
+            shareFileURL = fileURL
         }
     }
 
     func exportPDF() {
         if let fileURL = PDFReportManager.createPDF(expenses: viewModel.expenses, monthlyLimit: viewModel.monthlyLimit) {
-            pdfURL = fileURL
-            showingPDFShareSheet = true
+            shareFileURL = fileURL
         }
     }
 }

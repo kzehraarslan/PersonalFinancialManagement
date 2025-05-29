@@ -11,8 +11,11 @@ class ExpenseViewModel: ObservableObject {
 
     init() {
         loadExpenses()
-        // Uygulama açıldığında da bildirim yetkisi iste
+        // Uygulama açıldığında bildirim yetkisi iste
         requestNotificationAuthorization()
+        
+        // ✅ Uygulama açıldığında limit kontrolü yap
+        checkLimitOnLaunch()
     }
     
     private func requestNotificationAuthorization() {
@@ -32,9 +35,8 @@ class ExpenseViewModel: ObservableObject {
             date: date
         )
         newExpense.photoData = photoData
-        expenses.append(newExpense)
+        expenses.insert(newExpense, at: 0)
         
-        // Limit aşıldı mı kontrol et ve bildirim gönder
         if isLimitExceeded() {
             sendLimitExceededNotification()
         }
@@ -145,8 +147,6 @@ class ExpenseViewModel: ObservableObject {
             .reduce(0) { $0 + $1.amount }
     }
 
-    // Ekstra raporlar
-
     func topCategory() -> (category: Category, amount: Double)? {
         let totals = totalPerCategory()
         guard let max = totals.max(by: { $0.value < $1.value }) else { return nil }
@@ -163,20 +163,24 @@ class ExpenseViewModel: ObservableObject {
         expenses.reduce(0) { $0 + $1.amount }
     }
     
-    // Local Notification gönderme fonksiyonu
     private func sendLimitExceededNotification() {
         let content = UNMutableNotificationContent()
         content.title = "Aylık Limit Aşıldı!"
         content.body = "Aylık harcama limitiniz aşıldı, dikkatli harcama yapın."
         content.sound = .default
         
-        // Anında gösterim için trigger yok, direkt gönderiyoruz
         let request = UNNotificationRequest(identifier: "limitExceeded", content: content, trigger: nil)
-        
         UNUserNotificationCenter.current().add(request) { error in
             if let error = error {
                 print("Limit aşıldı bildirimi gönderilemedi: \(error.localizedDescription)")
             }
+        }
+    }
+    
+    // ✅ Yeni fonksiyon: Uygulama açıldığında limiti kontrol et ve bildirimi tetikle
+    private func checkLimitOnLaunch() {
+        if isLimitExceeded() {
+            sendLimitExceededNotification()
         }
     }
 }
